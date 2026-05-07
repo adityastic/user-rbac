@@ -270,7 +270,7 @@ def _patch_service_registry(hass: HomeAssistant):
                 else:
                     user_id = None
                 
-                if user_id and _is_builtin_ha_user(user_id, self._hass):
+                if user_id and await _is_builtin_ha_user(user_id, self._hass):
                     _LOGGER.warning(f"Skipping RBAC enforcement for built-in HA user: {user_id} ({user.name if user else 'Unknown'})")
                     return await self._original.async_call(domain, service, service_data, blocking, context, **kwargs)
                 
@@ -543,24 +543,21 @@ def _is_service_restricted_for_user(domain: str, service: str, user_id: str, has
     return False
 
 
-def _is_builtin_ha_user(user_id: str, hass: HomeAssistant = None) -> bool:
+async def _is_builtin_ha_user(user_id: str, hass: HomeAssistant = None) -> bool:
     """Check if a user is a built-in Home Assistant user that should be excluded from RBAC.
     
-    This function checks if the user has a corresponding person.* entity.
-    Built-in HA users (like Supervisor, Home Assistant Content, etc.) don't have person entities.
+    Uses `hass.auth` to look up the user and check the `system_generated` flag.
     """
     if not hass:
         # Fallback to name-based checking if hass is not available
         return False
     
-    all_states = hass.states.async_all()
-    for state in all_states:
-        if state.entity_id.startswith('person.'):
-            if hasattr(state, 'attributes') and 'user_id' in state.attributes:
-                if state.attributes['user_id'] == user_id:
-                    return False
+    user = await hass.auth.async_get_user(user_id)
+
+    if user is None:
+        return False
     
-    return True
+    return bool(user.system_generated)
 
 
 def _check_service_access_with_reason(

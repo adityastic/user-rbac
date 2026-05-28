@@ -223,7 +223,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             }
         
         # Check if user is a built-in HA user
-        if _is_builtin_ha_user(user_id):
+        if await _is_builtin_ha_user(user_id, hass):
             _LOGGER.warning(f"Cannot add built-in Home Assistant user: {user_id}")
             return {
                 "success": False,
@@ -619,8 +619,8 @@ class RBACUsersView(HomeAssistantView):
                 try:
                     user = await hass.auth.async_get_user(user_id)
                     if user:
-                        # Skip built-in Home Assistant users (those without person entities)
-                        if _is_builtin_ha_user(user_id, hass):
+                        # Skip built-in Home Assistant users (those that are marked as 'system_generated')
+                        if await _is_builtin_ha_user(user_id, hass):
                             _LOGGER.debug(f"Skipping built-in HA user: {user_id} ({user.name})")
                             continue
                         
